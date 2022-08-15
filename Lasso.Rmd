@@ -1,0 +1,121 @@
+---
+title: "Lasso"
+author: "Diana Escamilla"
+date: "April 18, 2019"
+output: html_document
+---
+
+#1 Problem 1: LASSO
+(a) Write a function gen_data to generate a training dataset (X, Y ). Your function should take in 4 arguments, n, p, sparsity and level. n is the number of observations, and p is their dimensionality, and generate X as an n × p matrix of mean-0, variance-1 Gaussian elements. The weight vector w is a p-dimensional vector, all of whose elements are 0 except the first sparsity elements, which all take value level. Generate the output vector Y as Yi = Xiw + ??i where Xi is the ith input, and ??iis Gaussian noise. Do not use for loops.
+
+```{r gen_data}
+gen_data <- function(n, p, s, l){
+  set.seed(1)
+  X<- matrix(rnorm(n*p, 0, 1), n, p)
+  W<- c(rep(l, s), rep (0,(p-s)))
+  noise<- rnorm(n= n, mean = 0, sd=2)
+  Y= (X%*%W) + noise
+  dataset<- cbind(X, Y) ##make a dataset containing X matrix and y vector
+ return(dataset)
+   }
+ 
+
+a<- gen_data(50,100,5, 5) ##a test to see if the function works
+
+```
+
+(b) Write a function lasso_loss that takes two inputs w and lambda and returns the values of the LASSO loss function for (X, Y ). You can treat (X, Y ) as additional inputs, or as global variables. [5]
+
+```{r Lasso_loss function}
+
+lasso_loss<- function(W, lambda){
+  lasso<- sum((Y - X*W)^2) + lambda*sum(abs(W))
+  return(lasso)
+  }
+
+```
+
+(c) Generate a dataset with n=50, p = 100, sparsity=5, level=5. [5]
+```{r Generate a dataset}
+dataset<- gen_data(50, 100, 5, 5)
+dataset
+```
+
+(d) Use the optim function to find the best-values of w for the dataset above on the LASSO loss function.Set lambda=1. Plot the true w and the returned w. [10]
+```{r Optimum Function}
+best_values<- function(fun, lambda, dataset){
+  Y<<- dataset[,101]
+  X<<- dataset[,1:100]
+  best_W<-optim(par = rep(0, 100), fun, l= lambda, method = c('CG'),lower = -Inf, upper= Inf, control = list(), hessian = FALSE)
+   par<- best_W$par
+   return(par)
+ }
+best_w<- best_values(lasso_loss, lambda = 1, dataset = dataset)
+
+Plot1<- function(){
+  returned_W<- best_w
+  W<- c(rep(5, 5), rep (0,(100-5)))
+  coeff<- c(W, returned_W)
+  Type<- c(rep("W", 100), rep("returned_W", 100))
+  parameters<- seq(1:100)
+  data<- data.frame(parameters, coeff, Type)
+  library(ggplot2)
+  plot<- ggplot(data)+ 
+  geom_point(aes(data$parameters, data$coeff, colour = Type))
+  return(plot)
+}
+output<- Plot1()
+output
+
+```
+
+(e) Use the optim function to find the best-values of w and lambda for the dataset above on the LASSO
+loss function. Plot the true w and the returned w. 
+
+
+```{r }
+lambda<- 5
+W<- c(rep(5, 5), rep (0,(100-5)))
+par<- c(lambda, W)
+best_values<- function(dataset,fun){
+  Y<- dataset[,101]
+  X<- dataset[,1:100]
+   best_lambda<-optim(par = par, fun, lambda=5)
+   par<- best_lambda$par
+   return(par)
+ }
+best_w2<- best_values(dataset, lasso_loss)
+
+True_W<-par
+data<- data.frame(True_W, best_w2)
+
+library(ggplot2)
+ggplot(data)+ 
+  geom_point(aes(data$True_W, data$best_w2))
+
+
+```
+ Problem 2: Coordinate descent
+ 1. Write a function soft_threshold that takes in two scalar inputs, w and th. It should output the
+result of soft-thresholding, so that if the absolute value of w is less than th, it returns 0, else it returns w shifted by th towards 0. (see the slides). Plot the curve traced by this for th equal to 1, as you vary w, this should resemble the red curve in the slides. 
+```{r}
+
+soft_threshold <- function(w,th=1) {
+ Output <- NULL
+  if (abs(w) < th) { 
+    Output <- 0
+  } else if (w > 0) {
+      Output <- w - th
+  } else {
+        Output <- w + th}
+  return(Output)
+}
+
+w <-seq(from=-1.5, to=1.5, by=0.003)
+wGen <- c()
+
+for (i in 1:length(w)) {
+  wGen[i]<- soft_threshold(w[i],th=1)
+}
+plot(w,wGen)
+```

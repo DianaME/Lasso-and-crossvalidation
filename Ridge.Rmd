@@ -1,0 +1,259 @@
+---
+title: "Homework 5"
+author: "Diana Escamilla"
+date: "April 3, 2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+### Problem 1: Ridge regression##############
+(a) Sample a random 3 × 4 matrix X, and a random 4 × 1 matrix y. Solve w = (XX???)???1(Xy). Do not invert any matrices, directly use solve. The elements of the matrices can be Gaussian distributed. [3].
+```{r OLS }
+Step1<- function () {
+  set.seed(1)
+  X<- matrix(rnorm(12),3, 4)
+  Y<- matrix(rnorm(4), 4, 1)
+  W<- (solve(X%*% t(X)))%*% (X%*%Y)
+
+}  
+     
+Answer1<- Step1()
+Answer1
+
+```
+(b) What happens when X and Y are 4 × 3 and 3 × 1 matrices?
+
+In this case  I  have a dataset where I have more parameters than observations ( I will have 4 explanatory variables (Xs) and 3 observations) and XX??? is singular. Therefore, we can't invert XX???. One way to solve this is doing regularization by adding a small lamda to the diagonal
+
+These code produce the next error:
+Error in solve.default(X %*% t(X)) : system is computationally singular: reciprocal condition number = 7.60082e-18
+
+```{r OLS different dimmension of matrix}
+#Step2<- function () {
+ # X<- matrix(rnorm(12), 4, 3)
+ # Y<- matrix(rnorm(3),3, 1)
+  #W<- (solve(X%*% t(X)))%*% (X%*%Y)
+#}  
+      
+#Answer2<- Step2()
+#Answer2
+```
+
+(c) What's the solution to both for the regularized problem w = (XX??? + ??I)???1 
+(Xy)? Let ?? = 5
+
+```{r Regularization}
+Step3<- function(){
+  ##calculating the solution for matrix dimensions of problem a 
+  set.seed(1)
+  X1<- matrix(rnorm(12),3, 4)
+  Y1<- matrix(rnorm(4), 4, 1)
+  XX1<- X1%*% t(X1)
+  i1 = diag(1,nrow = nrow(X1))
+  W1<-(solve(XX1 +(5*i1)) %*% (X1%*%Y1))
+       print(W1)
+  ##Calculating the solution for when I have more parameters than observations
+  set.seed(2)
+  X2<- matrix(rnorm(12),4, 3)
+  Y2<- matrix(rnorm(3), 3, 1)
+  XX2<- X2%*% t(X2)
+  i2 = diag(1, nrow = nrow(X2))
+  W2<-(solve(XX2 +(5*i2)) %*% (X2%*%Y2))
+      print(W2)
+}
+
+Answer3<- Step3()
+
+```
+
+(d) Write a function train.ridge that takes as input a two element list ip_data and a scalar lambda. Internally, call the first element of ip_data as X (a matrix) and the second as y. Return the ridge regression solution for these values of X, Y and lambda 
+
+```{r train ridge}
+train.ridge<- function (ip_data, lambda){
+  X<- ip_data[[1]]
+  Y<- ip_data[[2]]
+  XX<- (X)%*%t(X)
+  I = diag(1, nrow = nrow(X))
+  W<-(solve(XX +(lambda*I)) %*% (X%*%Y))
+      return(W)
+}
+
+```
+
+(e) Store the X and y from part (a) as two elements of a list. Call train.ridge with this as the first input, and lambda = 5 as the second. You should get the same output as part (c).
+
+```{r Using the function train.ridge, echo=FALSE}
+Step4<- function(){
+set.seed(1)
+X1<- matrix(rnorm(12),3, 4)
+Y1<- matrix(rnorm(4), 4, 1)
+Inputlist<-list(X1, Y1)
+lambda<- 5
+  
+W<- train.ridge(Inputlist, lambda)
+return(W)
+}
+
+Answer4<- Step4()
+Answer4
+```
+
+(f) Assign the previous list the class "ridge" (it is now an object of type ridge). Also define a generic function train. Now you should get the same output as the previous part by calling train instead of
+train.ridge. Show this.
+
+```{r}
+##function to save the list data of point (a) and set this as ridge object
+Step5<- function(){
+set.seed(1)
+X1<- matrix(rnorm(12),3, 4)
+Y1<- matrix(rnorm(4), 4, 1)
+Inputlist<-list(X1, Y1)
+class(Inputlist)<- "ridge"; Inputlist
+return(Inputlist)
+}
+
+Inputlist<- Step5()
+
+##creating the generic function 
+train<- function (X, lambda= 5) UseMethod('train', X) 
+
+##using the function to estimate the ridge regression solution
+step6<- function(Inputlist){
+W<- train(Inputlist , 5)
+return(W)
+}
+
+Answer6<- step6(Inputlist)
+Answer6 ##this Answer 6 is W we will use to run the next function
+
+```
+
+(g) Write a function pred_err.ridge that takes as input a weight w and an object of type "ridge". It should return the prediction error between the actual y and the prediction from X and w.
+
+```{r pred_err function}
+pred_err.ridge<- function(W, Input){
+  if (class(Input) == 'ridge'){
+  X<- Input[[1]]
+  Y<- Input[[2]]
+  Ypre<- t(t(W)%*%X)
+  SQPE<- (sum((Y - Ypre)^2))/ ncol(X)
+  }
+}
+
+answer7<- pred_err.ridge(Answer6, Inputlist)
+answer7
+
+
+```
+
+(h) Finally, write a function crossval. This takes 4 inputs, an object of class "ridge", a vector of lambda's, and an integer k. The function works as follows: first create k 'folds' of the input object, splitting it into training and test objects of the same class as the input. For each fold, call train and then pred_err for all values of lambda. Return the k × l matrix of prediction errors, where l is the length of the lambda vector. 
+
+```{r crossval}
+crossval<- function(Inputdata, lambdas, K){
+  if ( class(Inputdata) == "ridge"){
+  a<- seq(1:K)
+  Scores<-data.frame()
+  
+  for (i in a){
+    X<- Inputdata[[1]]
+    Y<- Inputdata[[2]]
+    M<-nrow(Y)/K  ##calculate the fold size
+    beg<- ((i-1)*M)+1
+    end<- i*M
+    ##data to train the model
+    datatrainy<- Y[-(beg:end), ]
+    datatrainx<- X[,-(beg:end) ]
+    Input<- list(datatrainx, datatrainy)
+    class(Input)<-"ridge"
+    ###data test objects 
+    datafoldy<- Y[beg: end,]
+    datafoldx<- X[,beg:end]
+    datafold<- list(datafoldx, datafoldy)
+    class(datafold)<- "ridge"
+    PE<- c()
+      for (i in lambda){
+      W<- train(Input, i)
+      PErr<- pred_err.ridge (W, datafold)
+      PE<- c(PE, PErr)
+      }
+    Scores<-rbind(Scores, PE)
+  }
+  return(Scores)
+}
+   
+} 
+  
+```
+
+(i) Download the credit dataset from http://www-bcf.usc.edu/~gareth/ISL/data.html. Load using read.table. This has a number of columns: extract column (Balance) as y, and extract (Income, Limit, Ratings Age and Education) as X. Convert this into a ridge object called my_credit.
+
+```{r credit dataset}
+Dataset<- function(){
+  library(dplyr)
+  data<- read.csv(url("http://www-bcf.usc.edu/~gareth/ISL/Credit.csv"))
+  InputdataX<- t(as.matrix(data%>% select(Income,Limit,Rating,Age,Education)))
+  InputdataY<- as.matrix(data%>%select(Balance))
+  Inputdata<- list(InputdataX,InputdataY)
+  return(Inputdata)
+}
+
+My_credit<- Dataset()
+
+```
+
+(j) Carry out 5-fold cross-validation with my_credit as the data. Set lambda to c(0, 0.1, 0.5, 1, 5, 10, 50, 100, 1000). Show the output
+
+```{r 5 fold cross validation with my credit data}
+lambda<- c(0, 0.1, 0.5, 1, 5, 10, 50, 100, 1000)
+
+test<- function(Inputdata, lambda, k ){
+  class(Inputdata) <-'ridge'
+  scores<- crossval(Inputdata, lambda, k)
+  colnames(scores)<- c("L0", "L0.1", "L0.5", "L1", "L5","L10", "L50", "L100", "L1000")
+  return(scores)
+  }
+
+
+output<- test(My_credit,lambda, 5)
+output
+
+```
+
+(k) Calculate the mean prediction error for each values of lambda, and plot it. [8]
+
+```{r mean prediction errof for each lambda}
+mean_PE<- function(output, k){ ##input we have the kx l matrix and the k fold number
+  library(dplyr)
+  library(ggplot2)
+  mean_squared_PE<- (colSums(output))/5
+  lambda<- c(0, 0.1, 0.5, 1, 5, 10, 50, 100, 1000)
+  data<- data.frame(cbind(lambda, mean_squared_PE)); print(data)
+  p<- ggplot(data, (aes(lambda,mean_squared_PE))) +geom_line(color="blue", size= 5)
+  print(p)
+}
+
+final_output<- mean_PE(output, 5)
+
+```
+
+(l) Choose the best lambda. Now, find the ridge-regression coefficient vector for this lambda using the entire data. 
+BEST LAMBDA= 10
+Looking at the graph and the table of the mean of the square predicted errors the best lambda is 10 (when we get the min saqured predicter error)
+
+```{r best lambda was 10}
+Coeffvector<- function(Inputdata, lambda){ ##to obtain the coefficient of the whole dataset
+    class(Inputdata)<-'ridge'
+     train.ridge(Inputdata, lambda)
+  }
+
+coeff<- Coeffvector(My_credit, 10)
+coeff
+```
+
+

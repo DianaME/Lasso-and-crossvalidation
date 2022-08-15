@@ -1,0 +1,337 @@
+---
+title: "Final Project: Prediction of Average Speed Adopted by Vehicles in Indiana: A Rural vs Urban Area Comparison"
+author: "Diana Escamilla, Tong Qi, Cristhian Lizarazo"
+date: "May 2nd, 2019"
+output: html_document
+---
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+library(rmarkdown)
+library(ggplot2)
+library(tidyverse)
+library(shiny)
+library(ggvis)
+library(class)
+library(gmodels)
+```
+1. 	Introduction and objectives
+<br />
+Speeding over the posted speed limits and in certain conditions is a factor that causes almost a third of fatalities on roadways. In 2015, there were 35,092 traffic fatalities (NHTSA, 2017), a 3% higher than occurred in 2014. Driver characteristics (age, behavior, etc), alcohol and drugs and other factors may influence on speed. Although public concern is focused mainly on high-speed interstates about half of speeding fatalities occur on arterial roads, and lower speed collectors and local roads. <br /> 
+This project aims to develop a model to predict the average speed adopted by vehicles in road segments on rural as well as urban areas in Indiana. Data from INRIX was obtained via the Center for Road Safety at Purdue University. This data will be analyzed to develop a model for speed. This unique dataset speed of road segments from most part of  Indiana roadway system with millions of observations monthly. These observations are registered every minute into a database server. Keeping in mind the objective of the following report, speeds are aggregated to a monthly bases. It will help the research team to identify conditions and possible measures to implement in order to reduce adopted speed of drivers in Indiana. 
+<br />
+
+2. 	Data 
+<br />
+The dataset includes monthly average speed adopted by vehicles in a total of 543 road segments. For each one of these segments average speed from May 2015 until March 2017 was estimated. After removing rows with missing data the total number of observations corresponds to 11375. In addition, to the reported speed, the research team possesses more than 57 covariates. These covariates span a variety of categories that might influence the speed of vehicles such road infrastructure (number of lanes, lane width) , weather conditions (level of precipitation, temperature), and special speed areas (school zones). Descriptive statistics of the multiple variables are shown in the following table:
+
+```{r statistical summary of variables}
+##creating a table with mean, sd and variance
+function_summary<- function(){
+#setwd("/Users/tongqi/Documents/1STUDY/stat598RAO/project")
+data1<- read.csv("Dataset_Complete_Lasso_no_zero.csv", header = T)
+data1<- data1[,-c(1,2,3)]
+data1<- as.data.frame(lapply(data1, function(x) as.numeric(as.character(x))))
+data1<-na.omit(data1)
+
+##ELIMINATING UNDERSCORE FROM THE COLNAMES
+coln<-gsub("_+","", colnames(data1))
+colnames(data1)<- coln
+
+###CREATING THE SUMMARY
+df<- tbl_df(data1)
+df.sum<- df%>% summarise_each(funs (min= min,
+                                    q25= quantile(.,0.25),
+                                    median= median,
+                                    q75 = quantile(.,0.75),
+                                    max= max,
+                                    mean= mean,
+                                    sd = sd))
+
+##the result is a wide dataframe SO NOW WE RESHAPE IT USING TIDYR FUNCTION
+
+df.stats.tidy<-  df.sum %>% gather(key= stat, value =  val) %>%
+  separate(stat, into = c("var", "stat"), sep = "_") %>%
+  spread(stat, val) %>%
+  select(var, min, q25, median, q75, max, mean, sd)
+
+return(df.stats.tidy)
+}
+
+Summ_data<- function_summary()
+Summ_data
+
+```
+3. 	Graphical Analysis <br />
+An in-depth graphical analysis is shown in order to evaluate the effect of time in the adopted speed of drivers as well as the difference between urban vs rural conditions. The first ggvis plot aims to show the difference between speed distributions across years and months. <br />
+
+a.     Histogram with speed per year per month: We can observed that average speed across months and year is fairly normal distributed with values ranging from 10 to 65 mi/h. Specific histograms for the recorded months in 2017, 2016 and 2017 gave information about the range of speed and most common speed of vehicles in Indiana for the specific month and year. <br />
+
+
+```{r interactive plots for histograms per month per year}
+
+Interactive_histograms<- function(){
+data1<- read.csv("Dataset_Complete_Lasso_no_zero.csv", header = T)
+#data1<- data1%>%select(yr,month, Avg_speedd)
+data1$yr<- as.numeric(data1$yr)
+data1$month<-as.double(data1$month)
+data1<-na.omit(data1)
+data1<- as.data.frame(data1)
+data1<- data1 %>%unite(Year_month, yr, month)
+
+##setting the column to filter from
+Year_month <- as.vector(unique(data1$Year_month))
+
+##making the interactive plot to select months per year and see the histogram of average speed
+plt<-data1 %>%
+          ggvis(~Avg_speedd) %>%
+            filter(Year_month == eval(input_select(
+            choices = Year_month,
+            label = "Year_Month List"))) %>%
+          layer_histograms(width = 2, stroke:= "black", fill:="red")
+return(plt)
+
+}
+
+
+Histograms_permonth_and_year<- Interactive_histograms()
+Histograms_permonth_and_year
+
+
+```
+
+b. Scatter plot of adopted speed per month Rural vs Urban
+<br />
+
+This second graph shows a plot with the difference of the adopted speed of urban vs rural. We can see the difference that there is some variation in time as well as different facets of these two conditions. 
+
+
+
+```{r}
+#loading dataset
+function_4<- function(){
+data1<- read.csv("Dataset_Complete_Lasso_no_zero.csv", header = TRUE)
+data1<- as.data.frame(lapply(data1, function(x) as.numeric(as.character(x))))
+data1<-na.omit(data1)
+return(data1)
+}
+dataset<- function_4()
+#### setting x and y for running lasso
+x<- dataset[,2:57]
+x<<-as.matrix(x)
+
+y<<- dataset[,1]
+y<<- as.matrix(y)
+
+datatibble<-as.tibble(dataset)
+
+sumData <- datatibble %>% 
+  group_by(XDSegID, month, Downtown_ind) %>%
+  summarise(speedA=mean(Avg_speedd))
+
+plot1<-sumData%>%
+ ggvis(x=~month,y=~speedA) %>%
+ filter(XDSegID %in% eval(input_select(choices =
+unique(as.character(sumData$XDSegID)),
+ multiple=TRUE, label='Segment list'))) %>%
+ layer_paths(x=~month,y=~speedA)
+
+plot1 
+
+sumData$XDSegID<-as.character(sumData$XDSegID)
+sumData$Downtown_ind<-as.character(sumData$Downtown_ind)
+
+sumDataP <- sumData %>%group_by(month,Downtown_ind)%>%summarise(speedAv=mean(speedA), speedStd=sd(speedA))
+
+plot2<-ggplot(sumDataP, aes(x=month, y=speedAv, size=speedStd)) + geom_line() + facet_grid(.~Downtown_ind)+theme(legend.position = "none")
+
+plot2
+```
+
+
+1) Lasso Function
+Least absolute shrinkage and selection operator was used to obtain a subset of predictors that minimized the prediction error and reduced the high dimensionality of the dataset. Initial coefficients are showed next. 
+
+```{r Lassso }
+
+#loading the Dataset
+function_4<- function(){
+#setwd("C:/Users/Diana/OneDrive - purdue.edu/Purdue Folder/Spring_2019/Stats_5900/project")
+setwd("C:/Users/descamil/OneDrive - purdue.edu/Purdue Folder/Spring_2019/Stats_5900/project")
+data1<- read.csv("Dataset_Complete_Lasso_no_zero.csv", header = FALSE)
+data1<- data1[-1,]
+data1<- data1[,-c(1,2,3)]
+data1<- as.data.frame(lapply(data1, function(x) as.numeric(as.character(x))))
+data1<-na.omit(data1)
+return(data1)
+}
+
+dataset<- function_4()
+##centralization function
+#center_colmeans <- function(x) {
+#  xcenter = colMeans(x)
+#   x - rep(xcenter, rep.int(nrow(x), ncol(x)))
+#}
+#### setting x and y forr running lasso and centering all the explanatory variables
+x <- dataset %>% .[2:57] %>% scale(center=TRUE, scale= FALSE)%>% as.matrix()
+colnames(x)<- NULL
+#x<<-as.matrix(x)
+y<<- dataset[,1]
+y<<- as.matrix(y)
+
+##creating a new dataset with centralize data
+
+centr_dataset<- cbind(y,x)
+
+
+##soft_threshold function
+library(dplyr)
+soft_threshold <- function(wSoft,th) {
+  softThres <- c()
+  if (abs(wSoft) < th) {softThres <- 0} 
+  else if (wSoft > 0) {softThres <- wSoft - th} 
+  else {softThres <- wSoft + th}
+  return(softThres)
+}
+
+##Lasso sollution for 1 dimensional data
+lasso1d <- function(xOne, y, lambda) {
+    wOLS <- (t(y)%*%xOne)/(t(xOne)%*%xOne)
+    thL<-((lambda)/(t(xOne)%*%xOne))
+    wLasso <-soft_threshold(wSoft=wOLS,th=thL)
+    return(wLasso)
+}
+##solve multidimensional data
+#to obtain the residuals
+
+get_residual <- function(w,dim,x,y) {
+  w[dim] <- 0
+  yPred <- x%*%w
+  residGen <- y-yPred
+  return(residGen) 
+}
+
+
+##lasso function for multidimensional data
+lassopdOpt1 <- function(x, y, p, lambda, threshold, iter){
+  #w_initial <- solve(crossprod(x) + diag(lambda, ncol(x))) %*% crossprod(x,y)
+  w_old<-rep(0,p)
+  #w_update <- c()
+  # for (i in 1:p) {
+  #   residual<- get_residual(w_initial,i,x=x,y=y) 
+  #   w_update[i] <- lasso1d (xOne=x[,i],y=residual,lambda)
+  # }
+  tol_curr = 1000
+  i<-1
+  while (threshold < tol_curr && i < iter) {
+    w_current = w_old
+    for (i in 1:p) {
+      residual<- get_residual(w_current,i,x=x,y=y) 
+      w_current[i] <- lasso1d (xOne=x[,i],y=residual,lambda)
+    }
+    tol_curr = crossprod(w_current - w_old)
+    w_old<-w_current
+    i<-i+1
+  }
+return(w_current)
+}
+
+```
+
+
+```{r running lasso}
+
+###running Lasso
+
+results<- lassopdOpt1(x,y,56,100,0.01,10000)
+results
+
+```
+
+To select the best lambda, k-fold cross validation was used  and a lambda of 170001 was identified as the lambda that produces the less prediction error. The lambda was identified from the mean prediction errors table and graph found next.
+
+```{r cross validation function}
+
+##prediction error
+pred_err.lasso<- function(W, X,Y){
+  Ypre<- X%*%W
+  SQPE<- (sum((Y - Ypre)^2))/ nrow(X)
+  }
+
+
+## crosvalidation function 
+crossval<- function(X, Y, lambda, K, p, threshold, iter ){
+  a<- seq(1:K)
+  Scores<-data.frame()
+  
+  for (i in a){
+    M<-nrow(Y)/K  ##calculate the fold size
+    beg<- ((i-1)*M)+1
+    end<- i*M
+    ##data to train the model
+    datatrainy<- Y[-(beg:end), ]
+    datatrainy<-as.matrix(datatrainy)
+    datatrainx<- X[-(beg:end), ]
+     datatrainx<- as.matrix(datatrainx)
+    
+    ###data test objects 
+    datafoldy<- Y[(beg:end),]
+    datafoldy<- as.matrix(datafoldy)
+    datafoldx<- X[(beg:end),]
+    datafoldx<- as.matrix(datafoldx)
+    
+    PE<- c()
+      for (i in lambda){
+      W<- lassopdOpt1(x= datatrainx, y=datatrainy, p, lambda= i, threshold, iter)
+      PErr<- pred_err.lasso (W, datafoldx, datafoldy)
+      PE<- c(PE, PErr)
+      }
+    Scores<-rbind(Scores, PE)
+  }
+  return(Scores)
+}
+```
+
+Table of squared prediction errors for each lambda and each fold
+```{r crossvalidation}
+lambdas<- c(seq(0.1, 10000, 100), seq(10001, 3000000, 10000))
+
+test<- function(X,Y, lambda, K, p, threshold, iter ){
+  scores<- crossval(X, Y, lambda, K, p, threshold , iter)
+  colnames(scores)<- lambdas
+  return(scores)
+  }
+
+
+output<- test(X= x, Y= y, lambdas, K=5, p=56, threshold = 0.01, iter=10000)
+output
+
+
+
+
+```
+
+Mean squared prediction error for each lambda
+
+```{r plotting prediction error}
+mean_PE<- function(output, k){ ##input we have the kx l matrix and the k fold number
+  library(dplyr)
+  library(ggplot2)
+  mean_squared_PE<- (colSums(output))/5
+  lambda<- c(seq(0.1, 10000, 100), seq(10001, 3000000, 10000))
+  #log_lambda<- log(lambda)
+  data<- data.frame(cbind(lambda, mean_squared_PE)); print(data)
+  p<- ggplot(data, (aes(lambda,mean_squared_PE))) +geom_smooth(color="blue", size= 2)
+  print(p)
+}
+
+final_output<- mean_PE(output, 5)
+```
+
+Coefficients obtain running lasso using the best lambda 
+```{r running r with the best lambda}
+## the best lambda where we have the lower mean square error is 290001
+Lasso_after_crossvl<- lassopdOpt1(x,y,56,170001,0.01,10000)
+Lasso_after_crossvl
+
+```
+

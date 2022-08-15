@@ -1,0 +1,326 @@
+---
+title: "Homework3_DianaEscamilla"
+author: "Diana Escamilla"
+date: "February 16, 2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+# Problem 1: Dataframes and ggplot2
+a) install package maps and load it into your session of R
+b) The function map_data() returns a dataframe containing information for a map, the choice of map determined by the map argument. Call this function, setting map to "state".
+
+
+```{r installing packages}
+#install.packages("maps") #I already installed r so I put numeral 
+func_1<- function(){
+  library(ggplot2)
+  library(maps)
+  map_data("state")
+}
+
+States_map<- func_1()
+```
+
+b) What is the dimensionality of the returned dataframe? What are the names of its columns? 
+
+```{r dimensions dataframe}
+func_2<- function (file1){
+  dimensions<- str(file1); print(dimensions) ##dimensions of the dataframe
+  col<-colnames(file1); print(col)
+}
+
+results2<- func_2(States_map)
+
+```
+
+
+c) The unique() function returns the unique elements of a vector. Print the number of unique values of the column region of the dataframe returned in the previous step. 
+
+```{r unique values}
+#for running most of the functions the input file is the States_map file gereated in the first point
+func_3 <- function(file1){
+  region<- file1[,5]
+  uniq_elements<- unique(region)
+  number<-length(uniq_elements); print(number)
+}
+
+results3<- func_3(States_map)
+```
+
+d) The columns lat and long of the dataframe correspond to latitude and longitude. Use ggplot to plot the dataframe with the x-axis as the longitude and the y-axis as lattitude. States should have different color. Each (latitude, longitude)-pair should be a 'point'. 
+
+```{r plot 1}
+func_4 <- function(file1){
+  library(ggplot2)
+  ggplot(file1, aes(x=long,y=lat, color = region))+ geom_point()+theme(legend.position = "none")
+}
+
+results4<- func_4(States_map)
+results4
+```
+
+e) Now connect the points from the previous slide with lines. Is geom_line or geom_path appropriate? Explain the difference and show the plot. [10pts]
+
+```{r plot 2}
+#to connect the points I used geom_path because it connects the points in the order in which they appear in the data. While, geom_Line connects them in order of the variable on the x axis. 
+func_5 <- function(file1){
+  library(ggplot2)
+  ggplot(file1, aes(x=long,y=lat, color = region))+ geom_point()+geom_path()+theme(legend.position = "none")
+}
+
+results5<- func_5(States_map)
+results5
+```
+
+f) Choose any two states. Plot the (latitude,longitude)-pairs only for those two states, connecting them with lines as before.
+
+```{r plot 3}
+func_6 <- function(file1){
+  Arkansas<- file1[which(file1$region == "arkansas"),names(file1) %in% c("long", "lat", "group","order","region", "subregion")]
+  Indiana <- file1[which(file1$region == "indiana"),names(file1) %in% c("long", "lat", "group","order","region", "subregion")]
+  two_states<- rbind(Arkansas, Indiana)
+  ggplot(two_states, aes(x=long,y=lat, color = region))+ geom_point()+geom_path()
+}
+
+results6<- func_6(States_map)
+results6
+```
+
+g) Repeat the last step, first using the sample() function to randomly permute the rows. 
+
+```{r plot 4}
+func_7 <- function(file1){
+  Arkansas<- file1[which(file1$region == "arkansas"),names(file1) %in% c("long", "lat", "group","order","region", "subregion")]
+  Indiana <- file1[which(file1$region == "indiana"),names(file1) %in% c("long", "lat", "group","order","region", "subregion")]
+  two_states<- rbind(Arkansas, Indiana)
+  nr<- nrow(two_states)
+  df<- two_states[sample(nr),]
+  ggplot(df, aes(x=long,y=lat, color = region))+ geom_point()+geom_path()
+}
+
+results7<- func_7(States_map)
+results7
+```
+
+h) A much nicer approach to plotting is to use the geom_map geometry. From here onwards, we will call the result from part (b) as states_map. Then this command will look like: 
+
+```{r plot 5}
+func_8 <- function (file1){
+  ggplot() + geom_map(map = file1, map_id=file1$region, data = file1, aes(fill=group)) + 
+    expand_limits(x = file1$long, y = file1$lat) +
+    scale_fill_gradient2(name = "group_no", low="red4", high = "tomato1") 
+  
+}
+
+results8<- func_8(States_map)
+results8
+
+```
+
+i) You can look at the documentation of geom_map, but to keep things simple we will focus only on the aes part. Above we have chosen to fill each state according to the group column. Note that group takes 63 values which is more than the number of states. To avoid any possible mistakes, add a new column to states_map, assigning each row a unique integer according to its associated state. You can use a for loop. Plot the result
+
+```{r plot 6}
+func_9 <- function (file1){
+  groups<- unique(file1$region)
+  i = 0
+  file1$group_no = NA
+  for ( g in groups) {
+    i = i + 1
+    file1[ file1$region == g, ]$group_no = i}
+  
+  ggplot() + geom_map(map = file1, map_id=file1$region, data = file1, aes(fill=group_no)) + expand_limits(x = file1$long, y = file1$lat)+ scale_fill_gradient2(name = "group_no", low="plum1", high = "purple4") 
+  
+}
+
+results9<- func_9(States_map)
+results9
+```
+
+
+j) The state dataset contains information for US states, you can load it by data(state). state.name gives the name of states, and state.x77 gives some statistics for the states. The fifth column gives the number of murder arrests per 100,000 people for different states. Repeat the last step, now assigning each row its associated murder arrest count (call the column "InfoValue". Since one dataframe capitalizes the state names, and the other doesn't, you might want to use to tolower() function to convert strings to lower case. Again, you can use for loops if you want to. WARNING: the order of states in the two datasets is not necessarily the same. 
+
+
+```{r plot 7 }
+
+func_10 <- function (file1){
+  region<- state.name
+  region<-tolower(region)
+  InfoValue<- state.x77[,5]
+  murd_dat<- as.data.frame(cbind(region,InfoValue), row.names = FALSE, stringsAsFactors = FALSE)
+  
+  file9<- merge(file1, murd_dat,all.x=TRUE,sort = FALSE) 
+  ggplot() + geom_map(map = file9, map_id=file9$region, data = file9, aes(fill=InfoValue)) + expand_limits(x = file9$long, y = file9$lat)
+ }
+results10<- func_10(States_map)
+
+results10
+
+```
+
+
+k) In this and the next question, we will plot two maps side by side using facet_grid. You can choose
+any two columns of state.x77, I recommend picking two that have similar ranges (or normalize them
+to be so). From the example in the class slides, facet_grid expects a column which determines
+which panel the corresponding row belongs to. To do this, add one more column to states_map:
+call it "InfoType" and set it to "Murder" for each row. Then make a copy of states_map, setting
+"InfoType to (e.g.) "Grad" and filling "InfoValue" with the corresponding column of state.x77.
+Stack these two dataframes on top of each other using rbind(). (Later, we will see easier ways of
+doing this using the reshape package.) [10pts]
+
+
+```{r plot 8}
+func_11<- function(file1){ 
+  ## creating the frist file with population data
+  region<- state.name 
+  region<-tolower(region)
+  InfoValue<- as.numeric(state.x77[,1])
+  Pop_data<- as.data.frame(cbind(region,InfoValue), row.names = FALSE, stringsAsFactors = FALSE)
+  Pop_data$InfoType <- "Population"
+  file10<- merge(file1,Pop_data, all.x=TRUE,sort = FALSE)
+  file10<- file10[!grepl("NA", file10$InfoType),]
+  ##creating the second file with Income data
+  InfoValue<- state.x77[,2] 
+  Inc_data<- as.data.frame(cbind(region,InfoValue), row.names = FALSE, stringsAsFactors = FALSE)
+  Inc_data$InfoType <- "Income"
+  file11<- merge(file1,Inc_data, all.x=TRUE,sort = FALSE)
+  #merging both datasets
+  file12<- as.data.frame(rbind(file10, file11))
+  
+  }
+
+result11<- func_11(States_map)
+
+```
+
+
+(l) Plot this using the facet_grid layer, with the facet determined by "InfoType"
+
+
+```{r plot 9}
+func_12<- function(file1, file2){
+  ##making columns as numeric and as factors
+  file1[,7]<- as.numeric(file1[,7])
+  file1[,1]<- as.factor(file1[,1])
+#removing NAs
+  library(tidyr)
+  file1<-file1 %>% drop_na(InfoType,InfoValue)
+#Doing the map
+  states_map <- file2
+  ggplot(file1, aes(map_id = region)) +
+    geom_map(aes(fill = InfoValue), map = states_map) +
+    expand_limits(x = states_map$long, y = states_map$lat)+
+    facet_grid( ~ InfoType)+
+      scale_fill_gradient(low="mistyrose",high = "salmon")
+}
+  func_12(result11, States_map )
+
+```
+
+m) Go back to part (j) where we have only one facet. Pick another column of state.x77: we will represent
+it as a circle located at the center of each state with radius proportional to value. Accordingly,
+create a new dataframe, with columns "State", "MeanLat", "MeanLong" and "ArrentCount". Here
+("MeanLat","MeanLong") are the mean (latitudes,longitudes) of the rows in states_map associated
+with each state. You can use for loop to calculate these. 
+
+
+```{r plot 10}
+func_13 <- function (file1){
+  ## creating the first file with population data
+  State<- state.name 
+  State<-tolower(State)
+  LeafExp<- as.numeric(state.x77[,4])
+  LeafExp<- as.data.frame(cbind(State,LeafExp), row.names = FALSE, stringsAsFactors = FALSE)
+  LeafExp$LeafExp<- as.numeric(LeafExp$LeafExp)
+  LeafExp$State<- as.factor(LeafExp$State)
+##calculating lat and long means
+  states_map <- file1
+  region<- unique(states_map$region)
+  variable<- "long"
+  variable2<- "lat"
+  mean_data <- data.frame(col1=vector(), col2=vector())
+  mean_data[,2]<- as.numeric(mean_data[,2])
+  mean_data1<-mean_data
+ for ( r in region) {
+  region_data<- states_map[which(states_map$region == r),names(states_map) %in% c("long", "lat")]
+   col1= r
+      for (j in variable){
+          col2=mean(region_data[,j])
+          mean_data<- rbind(mean_data, cbind(col1, col2))
+          assign(paste("mean_", j, sep = ""), mean_data)}
+      for (j in variable2){
+          col2=mean(region_data[,j])
+          mean_data1<- rbind(mean_data1, cbind(col1, col2))
+          assign(paste("mean_", j, sep = ""), mean_data1)}}
+  
+  #merging lat and long means
+  
+  dataset<- merge(mean_lat, mean_long, by="col1")
+  colnames(dataset)<- c("State","MeanLat","MeanLong")
+  dataset$MeanLat<- as.numeric(as.character(dataset$MeanLat))
+  dataset$MeanLong<-as.numeric(as.character(dataset$MeanLong))
+  print(dataset)
+                               
+  #merging latitude means with leafexpectation dataset
+  
+  finaldataset<- merge(dataset,LeafExp, all.x = TRUE, by="State")
+  
+  ##Making the plot
+  Final_map<- ggplot(states_map, aes(map_id = region))  +
+    geom_map(aes(color=region, fill=region), map = states_map)  +
+    expand_limits(x = states_map$long, y = states_map$lat)
+  
+  Final_map<- Final_map + 
+    geom_point(colour = "darkblue", aes(x=MeanLong, y= MeanLat, size = LeafExp), data = finaldataset)
+    
+  
+  Final_map
+    }
+
+results13<- func_13(States_map)
+results13
+
+```
+
+
+n)We used for loops in the previous parts. More compact is to use the sapply function. This expects
+two inputs: a vector X and a function fun, and returns a vector of the same length as X, obtained by
+applying fun to each element of X. We will set X to be the set of unique state names in states_map. The
+function fun expects a single input (a state name), and calculates and returns the mean latitude and
+longitude of that state. Write down the function fun, and print the output of applying to states_map.
+This should be the same as the previous subquestion. 
+
+
+```{r }
+func_14<- function(file1, funC){
+  States_map<- file1
+  Sta_name<- unique(file1$region)  
+    fun<- function(name){
+     region_data<- States_map[which(States_map$region == name),names(States_map) %in% c("long", "lat")]
+      MeanLong<- mean(region_data[,1])
+       MeanLat<- mean(region_data[,2])
+        Mean<- cbind(name,MeanLong,MeanLat)
+        return(Mean)
+}
+    
+  Dataset<-sapply(Sta_name, fun)
+  Dataset<- as.data.frame(t(Dataset), row.names = FALSE)
+  colnames(Dataset)<- c("State", "MeanLong", "MeanLat")
+  Dataset
+}
+
+results14<- func_14(States_map)
+results14
+```
+

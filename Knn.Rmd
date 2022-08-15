@@ -1,0 +1,172 @@
+---
+title: "K-nearest neighbour"
+author: "Diana Escamilla"
+date: "March 16, 2019"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##HOMEWORK 4####
+#PROBLEM 1: k-nearest neighbours [100pts]
+(a) We are going to implement k-nearest neighbours. Recall how this works: you're given some training data with labels. Given a new test datapoint, you decide its label by performing a majority vote among its k-nearest neighbours. Write down a skeleton or outline of how you might implement this (in R or in English/pseudocode). This needn't bear any similarity to your final program, but you should have an idea of all the pieces you'll need and how they fit together
+
+```{r K-Nearest Neighbor Pseudocode}
+#Let (Xi, Ci), where i= 1,2.....,n be data points
+#Xi are the values of each data point
+#Ci are the lables for Xi for each i 
+#Assuming the number of classes as 'C'
+#Ci is {1,2,3,..,C}  for all values of i
+# Let x be a point for which label is not known and we want to find the label class using k-nearest neighbor algorithms
+#steps:
+#1. Calculate the Euclidean distance between the points. d(x, xi) wiht i= 1,2,...,n where d denotes the euclidean distance between the points
+#2. Arrange calculated n Euclidean distances in non-decreasing order
+#3. Let K be a positive integer, take the first K distances from this sorted list
+#4. Find those K-points corresponding to these K-distances
+#5. Let Ki denotes the number of points belonging to the ith class among K points  i.e. K =>0
+#6. If ki >kj for all i different than j then put x in class i.
+```
+b) Install package RnavGraphImageData and use the data() function to load the digits dataset: data(digits). This dataframe contains the so-called USPS dataset, with each column having length 256, and representing an 16 × 16 image of a handwritten digit. See ?digits details. (WARNING: for some reason,digits 6 and 7 are overwritten by 5, don't let that confuse you later)
+```{r Loading Dataset}
+#install.packages("RnavGraphImageData")
+Func1<- function(){
+  library(RnavGraphImageData)
+  data(digits)
+  return(digits)
+    }
+Digits<- Func1()
+```
+c) It's helpful to visualize the digits, and we will write a function plot_digit to do this. It should take a vector (a column of digits) as input, and plot it using the image() function. For this you'll have to convert it to a 16 × 16 matrix (experiment with the byrow option of matrix). You can also play with the color argument of image, I used col = gray(0:255/255)
+```{r Plodigit Function}
+plot_digit<- function(vector){
+  a<-matrix(vector, ncol = 16, nrow = 16, byrow = TRUE)
+  a<- apply(a, 1, rev)
+  a<- t(a)
+  library(RColorBrewer)
+  image(a, col= brewer.pal(n=3, name = "Greens"))
+  }
+
+resutls2<- plot_digit(Digits$V7701) ##I run one column to see if the function works
+
+```
+d) What are the index ranges of each digit in digits? Plot the first instance of each digit (since image doesn't involve ggplot you don't have to organize it in a panel). However, instead of calling your function 10 times manually, write a for loop (or use *pply). Careful: the order of digits in digits is 1,2,.,9,0 rather than 0,1,2,.. You should notice that digits 6 and 7 are just 5
+```{r plot first instance of each digit}
+##there are 1100 repetitions of each number
+func2<- function(file){
+  seq<- c(1, 1101, 2201,3301, 4401,5508,6618,7701,8801,9901) ##when running the function it prints the 10 numbers however when knitting it omits two of the 5s (6 and 7), I have to print a different number for 6 and 7 digit to be able to see them in the final file instead of the first image of the digits.
+  apply(file[,seq],2,plot_digit)
+  }
+
+results3<- func2(Digits)
+
+```
+
+e) Write a function get_digits to convert digits to a smaller, more convenient dataset. get_digits should take two arguments: the first is a vector select_digs and the second is size. The function should return the first size elements of each digit in select_digs. Thus if get_digits is c(0,5,4) and size is 50, then the function should return a data frame of length 150, consisting of the first 50 images of 0, 5 and 4. Create a dataset my_train consisting of 100 instances of 0 and 8.
+```{r get_digits}
+get_digits<- function(select_digs, size){
+  cols<- numeric()
+  select_digs[select_digs== 0]<-10
+  Firtsimage<- (select_digs-1)*1100 +1
+  for (i in 1:length(Firtsimage)){
+    cols<- c(cols, seq(Firtsimage[i], length.out = size))
+  }
+  return(Digits[,cols])
+}
+select_digs<- c(0,8)
+size<- 100
+my_train<- get_digits(select_digs, size)
+```
+
+(f) Write a function euc_dist that accepts two vectors (of any length), and returns the Euclidean distance between them. You can normalize this by the vector length if you want
+
+```{r euclidian distances}
+library(dplyr)
+euc_dist<-function(a, b) (a-b)^2 %>% sum %>% sqrt
+```
+  
+(g) Given any new digit, we want to calculate the distance to every element of my_train. Use laply from package plyr. laply accepts a list as input and returns an array obtained by appling some function fun to each element of that list. Recall that my_train is a dataframe which is just a list. If the function needs more than one argument you can pass those to laply, see the documentation and recall how '...'works in functions. You overall syntax with look like my_arr <- laply(my_list, fun, second_arg) where you plug in appropriate variable names
+```{r distance between new digit and every element in my train}
+
+func3<- function(){
+  library(plyr)
+  new_digit<- Digits[763]
+  my_arr<- laply(my_train, euc_dist, new_digit)
+  return(my_arr)
+}
+
+results3<- func3()
+head(results3)
+length(results3)
+
+```
+
+(h) Now write a function get_knn that takes 3 inputs: a number k, the training data, and a single testvector. It should return the indices of the k nearest neighbours of the test-vector in the training data. It does this in three steps: first calculate the distance to each element in the training set, and then sort them using the sort command. Calling sort with the option index.return set to TRUE also returns
+the indices of the sorted elements. Finally, return the first k indices. 
+```{r function get_Knn}
+get_knn<- function(k, my_train, test_vector){
+  distances<- laply(my_train,euc_dist,test_vector)
+  indices<- sort(distances, index.return= TRUE)$ix ##allows to return the indices (positions) of the sorted elements
+  return(indices[1:k])
+}
+
+```
+i) Now write a function to get the majority label of the returned k indices. For this, it is useful to complement my_train from step (e) with a vector my_labels containing the corresponding labels.
+```{r labels}
+my_labels<- rep(c(0,8), each= 100)
+get_labels<- function(kindices){
+  labels<- my_labels[kindices]
+  lab<- table(labels)
+  return(names(which.max(lab)))
+}
+
+
+```
+j) Wrap the previous few functions into a function my_knn that takes four inputs: k, my_train, my_labels and test_ip, and returns the predicted label of test_ip from applying k-nearest neighbours. 
+
+```{r my_knn function}
+my_knn<- function(k, my_train, my_labels, test_ip ){
+  kindices<- get_knn(k, my_train, test_ip)
+  label<- get_labels(kindices)
+  return(label)
+}
+```
+
+(k) Set k = 5. Apply your function setting test_vec to each element of my_train. How many 0's does it get wrong? How many 8's? 
+```{r using my train as test_vec}
+
+Prediction<- function(test_ip, my_train, k, my_labels) {
+  predict<- laply(test_ip, my_knn, my_train = my_train, k=k, my_labels=my_labels)
+  a<- paste("my_knn got wrong", sum(predict[1:100] != my_labels[1:100]), "0's."); print(a)
+  b<-paste("my_knn got wrong", sum(predict[101:200] != my_labels[101:200]), "8's."); print(b)
+}
+
+Prediction(my_train, my_train, 5, my_labels)
+```
+(l) Apply your function to a hundred 0's and 8's from digits NOT present in my_train. How many of these does it get wrong?
+```{r apply the function to digits not present in my train}
+test1<- function (my_train, k, my_labels){
+  test_ip<- Digits[, c(10000:10099, 7900:7999)]
+  test_lables<- rep(c(0,8), each= 100)
+  predict<- laply(test_ip, my_knn, my_train = my_train, k=k, my_labels=my_labels)
+  a<- paste("my_knn got wrong", sum(predict[1:100] != test_lables[1:100]), "0's."); print(a)
+  b<-paste("my_knn got wrong", sum(predict[101:200] != test_lables[101:200]), "8's."); print(b)
+}
+test1(my_train, 5, my_labels)
+
+```
+ Apply it to one hundred 5's. How many of these does it classify as 0, and how many as 8? 
+```{r apply to a hundred 5s}
+
+test2<- function (my_train, k, my_labels){
+  test_ip<- Digits[, 4800:4899]
+  predict<- laply(test_ip, my_knn, my_train = my_train, k=k, my_labels=my_labels)
+  table(predict)
+}
+test2(my_train, 5, my_labels)
+```
